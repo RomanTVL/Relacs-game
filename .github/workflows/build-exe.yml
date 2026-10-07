@@ -1,0 +1,45 @@
+name: Сборка Relacs.exe
+
+on:
+  push:
+    branches: [main, master, claude/keen-fermat-b06xcc]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установка зависимостей
+        run: python -m pip install pygame pyinstaller
+
+      - name: Сборка exe
+        shell: pwsh
+        run: |
+          $data = Get-ChildItem *.mp3, iop.ogg, icon.png | ForEach-Object { "--add-data=$($_.Name);." }
+          python -m PyInstaller --noconfirm --onefile --windowed --name Relacs --icon icon.ico @data Relacs.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Relacs-exe
+          path: dist/Relacs.exe
+
+      - name: Публикация релиза
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Relacs — сборка ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          files: dist/Relacs.exe
+          make_latest: true
+          body: |
+            Скачай **Relacs.exe** ниже и запусти — установка не нужна, музыка внутри.
+            Прогресс сохраняется в %APPDATA%\Relacs.
