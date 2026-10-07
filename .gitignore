@@ -28,3 +28,11 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/windows
+
+# Python
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+screenshot*.png
