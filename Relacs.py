@@ -19,13 +19,28 @@ else:
 SAVE_PATH = os.path.join(DATA_DIR, "save.json")
 SCREENSHOT_DIR = os.path.join(os.path.expanduser("~"), "Pictures", "Relacs")
 
+# Русские сообщения в консоли не должны ронять игру на Windows с другой кодировкой
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 pygame.mixer.pre_init(44100, -16, 2, 512)
 pygame.init()
 try:
     pygame.mixer.init()
 except pygame.error as e:
+    # Нет звукового устройства — запускаем «немой» звук, чтобы игра всё равно работала
     print(f"Звук недоступен: {e}")
+    pygame.mixer.quit()
+    os.environ["SDL_AUDIODRIVER"] = "dummy"
+    pygame.mixer.init()
 
+try:
+    pygame.display.set_icon(pygame.image.load("icon.png"))
+except (pygame.error, FileNotFoundError):
+    pass
 screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 WIDTH, HEIGHT = screen.get_size()
 pygame.display.set_caption("Relacs")
@@ -6603,8 +6618,8 @@ def draw_mode_icon(surface, kind, center, size, color, t):
             pygame.draw.circle(surface, (255, 255, 220), (int(x), int(y)), 2)
     elif kind == "rings":
         for i in range(3):
-            r = (size * 0.2 + ((t * 18 + i * size * 0.25) % (size * 0.6)))
-            alpha = max(0, 255 - int(r / (size * 0.8) * 255))
+            r = size * 0.08 + ((t * 14 + i * size * 0.13) % (size * 0.38))
+            alpha = max(0, 255 - int(r / (size * 0.48) * 255))
             pygame.draw.circle(surface, (*color, alpha), center, int(r), 2)
     elif kind == "moon":
         pygame.draw.circle(surface, color, center, int(size * 0.38))
