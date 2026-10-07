@@ -7,6 +7,7 @@ import json
 import time
 import colorsys
 import array
+import atexit
 
 # === Пути к ресурсам: работает и из .py, и из собранного .exe (PyInstaller) ===
 BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -56,10 +57,6 @@ DEFAULT_SAVE = {
     "language": "ru",
     "volume": 0.5,
     "track_index": 0,
-    "visited": [],
-    "endings": [],
-    "red_stars_found": False,
-    "secret_entered": False,
 }
 
 
@@ -87,6 +84,7 @@ def write_save():
 
 
 SAVE = load_save()
+atexit.register(write_save)  # громкость/язык/трек сохраняются при любом выходе
 
 
 _surface_cache = {}
@@ -158,9 +156,6 @@ def make_tone(freqs, duration=0.08, volume=0.25, decay=30.0):
 
 
 UI_SOUNDS = {
-    "hover": make_tone([880], 0.06, 0.12, 50),
-    "click": make_tone([523, 784], 0.18, 0.22, 18),
-    "star": make_tone([1046, 1318, 1568], 0.5, 0.2, 7),
     "unlock": make_tone([659, 988, 1318], 0.9, 0.2, 4),
 }
 
@@ -3140,7 +3135,7 @@ def Firefly():
                     if burst_sound:
                         burst_sound.play()
                 elif event.key == pygame.K_s:
-                    pygame.image.save(screen, "screenshot.png")
+                    take_screenshot()
                     if clear_sound:
                         clear_sound.play()
                 elif event.key == pygame.K_q:
@@ -6498,676 +6493,382 @@ def run_main_mode():
 
         pygame.display.flip()
 MENU_TRACKS = ["Relacs.mp3", "Relacs2.mp3", "burning.mp3"]
-music_state = {"paused": False}
-
-MODES = [
-    {"id": "fireflies", "func": "Firefly", "color": (200, 255, 110), "icon": "fireflies",
-     "ru": ("Светлячки", "Ночное небо и тысячи огоньков"),
-     "en": ("Fireflies", "Night sky and a thousand lights")},
-    {"id": "cosmic", "func": "run_cosmic_symphony_mode", "color": (90, 200, 255), "icon": "rings",
-     "ru": ("Космическая симфония", "Рисуй звуковые волны и вихри"),
-     "en": ("Cosmic Symphony", "Paint sound waves and vortices")},
-    {"id": "moon", "func": "run_moon_river_mode", "color": (190, 200, 255), "icon": "moon",
-     "ru": ("Лунная река", "Луна, её фазы и поток света"),
-     "en": ("Moon River", "The moon, its phases and a flow of light")},
-    {"id": "skyburst", "func": "run_skyburst_mode", "color": (255, 160, 220), "icon": "burst",
-     "ru": ("Фейерверки", "Салюты, ветер и радужные взрывы"),
-     "en": ("Fireworks", "Salutes, wind and rainbow blasts")},
-    {"id": "relax", "func": "run_relax_mode", "color": (140, 255, 170), "icon": "flame",
-     "ru": ("Релакс", "Огонь за курсором под звёздами"),
-     "en": ("Relax", "Fire follows your cursor under the stars")},
-    {"id": "storm", "func": "run_cosmic_storm_mode", "color": (170, 100, 255), "icon": "bolt",
-     "ru": ("Космический шторм", "Полёт сквозь бурю, порталы и сны"),
-     "en": ("Cosmic Storm", "Fly through the storm, portals and dreams")},
-    {"id": "chaos", "func": "run_main_mode", "color": (255, 110, 110), "icon": "spiral",
-     "ru": ("Хаос", "Безумие частиц, темы и гравитация"),
-     "en": ("Chaos", "Particle madness, themes and gravity")},
-    {"id": "glass", "func": "run_fragments_mode", "color": (120, 235, 230), "icon": "shards",
-     "ru": ("Стекло", "Разбивай объекты на осколки"),
-     "en": ("Glass", "Shatter objects into shards")},
-]
-
-ENDINGS = [
-    ("merge", (80, 170, 255), {"ru": "Слияние", "en": "Merge"}),
-    ("forget", (170, 90, 220), {"ru": "Забвение", "en": "Forget"}),
-    ("escape", (255, 255, 230), {"ru": "Выход", "en": "Escape"}),
-    ("harmony", (80, 220, 150), {"ru": "Гармония", "en": "Harmony"}),
-    ("chaos", (255, 90, 40), {"ru": "Хаос", "en": "Chaos"}),
-]
-
-UI_TEXT = {
-    "ru": {
-        "subtitle": "сборник медитативных миров",
-        "riddle": "Каждый режим — своя вселенная. Но истинный ключ скрыт в красных звёздах…",
-        "modes": "Режимы", "endings": "Концовки", "new": "НОВОЕ",
-        "track": "Трек", "music_hint": "M — пауза · N — трек · L — язык",
-        "keys_hint": "↑↓←→ + Enter · F3 — FPS · F12 — скриншот · Esc — выход",
-        "volume": "Громкость", "secret": "???", "secret_desc": "Красные звёзды открыли путь…",
-        "quit_q": "Выйти из игры?", "quit_hint": "Enter — выйти   ·   Esc — остаться",
-        "warning": "ВНИМАНИЕ: в игре возможны резкие вспышки света и быстрые визуальные эффекты.",
-        "press": "Нажми любую клавишу", "red_star": "Красная звезда", "secret_open": "Тайный путь открыт",
-        "secret_open_sub": "Под режимами появилась новая дверь",
-        "mode_open": "Новый мир", "explorer": "Исследователь", "explorer_sub": "Ты побывал во всех режимах",
-        "ending_open": "Концовка", "all_endings": "Все концовки открыты!", "all_endings_sub": "Спасибо, что прошёл Relacs до конца",
-        "paused": "пауза",
-    },
-    "en": {
-        "subtitle": "a collection of meditative worlds",
-        "riddle": "Each mode is a universe of its own. Yet the true key lies within red stars…",
-        "modes": "Modes", "endings": "Endings", "new": "NEW",
-        "track": "Track", "music_hint": "M — pause · N — track · L — language",
-        "keys_hint": "Arrows + Enter · F3 — FPS · F12 — screenshot · Esc — quit",
-        "volume": "Volume", "secret": "???", "secret_desc": "The red stars opened a path…",
-        "quit_q": "Quit the game?", "quit_hint": "Enter — quit   ·   Esc — stay",
-        "warning": "WARNING: flashing lights and rapid visual effects may occur.",
-        "press": "Press any key", "red_star": "Red star", "secret_open": "Secret path unlocked",
-        "secret_open_sub": "A new door appeared below the modes",
-        "mode_open": "New world", "explorer": "Explorer", "explorer_sub": "You have visited every mode",
-        "ending_open": "Ending", "all_endings": "All endings unlocked!", "all_endings_sub": "Thank you for finishing Relacs",
-        "paused": "paused",
-    },
+music_state = {
+    "track": MENU_TRACKS[SAVE["track_index"] % len(MENU_TRACKS)],
+    "index": SAVE["track_index"] % len(MENU_TRACKS),
+    "paused": False,
+    "playing": False,
+    "volume": SAVE["volume"]
 }
+def show_intro_screen():
+    title_font = pygame.font.SysFont("segoeui", 56)
+    info_font = pygame.font.SysFont("consolas", 22)
+    warning_font = pygame.font.SysFont("consolas", 12)
+    info_lines_ru = [
+        "Перед тобой — не просто экран,",
+        "а сборник мини-игр в цифровой тишине.",
+        "Каждый режим — своя вселенная.",
+        "Но истинный ключ скрыт в красных звёздах…",
+    ]
+
+    info_lines_en = [
+        "Before you is not just a screen —",
+        "but a collection of mini-games in digital silence.",
+        "Each mode is a universe of its own.",
+        "Yet the true key lies within red stars…",
+    ]
+
+    showing = True
+    input_buffer = ""
+    menu_shown = False
+    hint_timer = pygame.time.get_ticks()
+    show_hint = True
 
 
-def tr(key):
-    return UI_TEXT[language][key]
+    button_width, button_height = 360, 70
+    gap = 80
 
+    button_labels = {
+        "ru": [
+            "Светлячки", "Космическая симфония", "Лунная река",
+            "Фейрверки-режим", "Релакс-режим", "Космический шторм",
+            "Хаос-режим", "Стекло-режим"
+        ],
+        "en": [
+            "Fireflies", "Cosmic Symphony", "Moon River",
+            "Fireworks Mode", "Relax Mode", "Cosmic Storm",
+            "Chaos Mode", "Glass Mode"
+        ]
+    }
 
-def set_language(lang):
-    global language, flag_is_russian
-    language = lang
-    flag_is_russian = lang == "ru"
-    SAVE["language"] = lang
-    write_save()
+    buttons = [
+        (0, Firefly, (15, 15, 15)),
+        (1, run_cosmic_symphony_mode, (2, 86, 105)),
+        (2, run_moon_river_mode, (4, 4, 4)),
+        (3, run_skyburst_mode, (200, 160, 255)),
+        (4, run_relax_mode, (180, 255, 180)),
+        (5, run_cosmic_storm_mode, (150, 0, 255)),
+        (6, run_main_mode, (255, 120, 120)),
+        (7, run_fragments_mode, (200, 100, 255)),
+    ]
+    epilepsy_warning_ru = "ВНИМАНИЕ: Возможны резкие вспышки света и быстрые визуальные эффекты."
+    epilepsy_warning_en = "WARNING: Flashing lights and rapid visual effects may occur."
+    # Вычисляем начальную Y-позицию кнопок — по центру
+    total_buttons_height = len(buttons) * gap
+    info_text_height = 10  # Высота блока с информационным текстом
+    start_y = HEIGHT // 3 + gap - 175  # Смещаем кнопки ниже
 
+    secret_button_rect = pygame.Rect(WIDTH // 2 - button_width // 2, start_y + gap * len(buttons), button_width,
+                                     button_height)
+    secret_button_data = ("???", run_illusion_mode, (255, 0, 255), "🌀")
+    secret_button_offset = [0, 0]
 
-def play_menu_music(force_reload=True):
-    track = MENU_TRACKS[SAVE["track_index"] % len(MENU_TRACKS)]
-    if not os.path.exists(track):
-        return
-    try:
-        if force_reload:
-            pygame.mixer.music.load(track)
-        pygame.mixer.music.set_volume(1.0)
-        if not music_state["paused"]:
-            pygame.mixer.music.play(-1)
-    except pygame.error as e:
-        print(f"Не удалось включить музыку: {e}")
+    # Звёзды: 100 обычных
+    stars = [(random.randint(0, WIDTH), random.randint(0, HEIGHT)) for _ in range(100)]
+    red_star_indices = []
 
-
-def make_glow(radius, color, strength=90):
-    def build():
-        surf = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-        steps = 24
-        for i in range(steps, 0, -1):
-            r = int(radius * i / steps)
-            a = int(strength * (1 - i / steps) ** 2)
-            pygame.draw.circle(surf, (*color, a), (radius, radius), r)
-        return surf
-    return cached_surface(("glow", radius, tuple(color), strength), build)
-
-
-def draw_mode_icon(surface, kind, center, size, color, t):
-    cx, cy = center
-    if kind == "fireflies":
-        for i in range(5):
-            a = t * 0.8 + i * 1.3
-            x = cx + math.cos(a) * size * 0.45
-            y = cy + math.sin(a * 1.3) * size * 0.35
-            surface.blit(make_glow(10, color, 140), (x - 10, y - 10))
-            pygame.draw.circle(surface, (255, 255, 220), (int(x), int(y)), 2)
-    elif kind == "rings":
-        for i in range(3):
-            r = size * 0.08 + ((t * 14 + i * size * 0.13) % (size * 0.38))
-            alpha = max(0, 255 - int(r / (size * 0.48) * 255))
-            pygame.draw.circle(surface, (*color, alpha), center, int(r), 2)
-    elif kind == "moon":
-        pygame.draw.circle(surface, color, center, int(size * 0.38))
-        offset = int(size * 0.18 + math.sin(t) * size * 0.06)
-        pygame.draw.circle(surface, (22, 24, 44), (cx + offset, cy - offset // 2), int(size * 0.34))
-    elif kind == "burst":
-        for i in range(12):
-            a = i * math.pi / 6 + t * 0.3
-            r1 = size * 0.12
-            r2 = size * (0.35 + 0.08 * math.sin(t * 3 + i))
-            pygame.draw.line(surface, color, (cx + math.cos(a) * r1, cy + math.sin(a) * r1),
-                             (cx + math.cos(a) * r2, cy + math.sin(a) * r2), 2)
-    elif kind == "flame":
-        flick = math.sin(t * 7) * size * 0.05
-        outer = [(cx, cy - size * 0.42 - flick), (cx + size * 0.25, cy), (cx + size * 0.18, cy + size * 0.3),
-                 (cx - size * 0.18, cy + size * 0.3), (cx - size * 0.25, cy)]
-        inner = [(cx, cy - size * 0.15 - flick), (cx + size * 0.12, cy + size * 0.1), (cx, cy + size * 0.28),
-                 (cx - size * 0.12, cy + size * 0.1)]
-        pygame.draw.polygon(surface, (255, 130, 40), outer)
-        pygame.draw.polygon(surface, (255, 230, 120), inner)
-    elif kind == "bolt":
-        s = size
-        pts = [(cx + s * 0.1, cy - s * 0.42), (cx - s * 0.18, cy + s * 0.04), (cx + s * 0.02, cy + s * 0.04),
-               (cx - s * 0.1, cy + s * 0.42), (cx + s * 0.2, cy - s * 0.08), (cx, cy - s * 0.08)]
-        if int(t * 3) % 4 != 0:
-            surface.blit(make_glow(int(s * 0.5), color, 70), (cx - int(s * 0.5), cy - int(s * 0.5)))
-        pygame.draw.polygon(surface, color, pts)
-    elif kind == "spiral":
-        prev = None
-        for i in range(40):
-            a = i * 0.35 + t * 2
-            r = i / 40 * size * 0.42
-            p = (cx + math.cos(a) * r, cy + math.sin(a) * r)
-            if prev:
-                pygame.draw.line(surface, color, prev, p, 2)
-            prev = p
-    elif kind == "shards":
+    # Зоны, где не должны появляться красные звёзды
+    def is_in_exclusion_zone(x, y):
+        # Заголовок
+        title_rect = pygame.Rect(WIDTH // 2 - 300, 20, 600, 60)
+        # Инфо-текст
         for i in range(4):
-            a = i * math.pi / 2 + t * 0.4
-            d = size * (0.12 + 0.06 * math.sin(t * 2 + i))
-            ox, oy = cx + math.cos(a) * d, cy + math.sin(a) * d
-            pts = [(ox + math.cos(a + k * 2.1) * size * 0.2, oy + math.sin(a + k * 2.1) * size * 0.2) for k in range(3)]
-            pygame.draw.polygon(surface, color, pts, 2)
-    elif kind == "secret":
-        for i in range(3):
-            r = size * (0.15 + 0.12 * i) + math.sin(t * 4 + i) * 3
-            pygame.draw.circle(surface, color, center, int(r), 2)
+            if 140 + i * 28 - 15 < y < 140 + i * 28 + 15 and WIDTH // 2 - 200 < x < WIDTH // 2 + 200:
+                return True
+        # Флаг
+        if WIDTH - 50 < x < WIDTH - 10 and 10 < y < 50:
+            return True
+        # Слайдер громкости
+        if WIDTH - 210 < x < WIDTH - 70 and 26 < y < 34:
+            return True
+        # Трек внизу
+        if x < 300 and y > HEIGHT - 100:  # Под треком и предупреждением
+            return True
+        # Кнопки
+        for i in range(len(buttons)):
+            btn_y = start_y + i * gap
+            if (WIDTH // 2 - button_width // 2 < x < WIDTH // 2 + button_width // 2 and
+                    btn_y < y < btn_y + button_height):
+                return True
+        # Секретная кнопка
+        if secret_button_rect.collidepoint(x, y):
+            return True
+        return title_rect.collidepoint(x, y)
 
+    # Размещаем ровно 4 красные звезды вне зон
+    while len(red_star_indices) < 4:
+        idx = random.randint(0, len(stars) - 1)
+        x, y = stars[idx]
+        if not is_in_exclusion_zone(x, y) and idx not in red_star_indices:
+            red_star_indices.append(idx)
 
-def draw_check(surface, center, size, color):
-    cx, cy = center
-    pygame.draw.lines(surface, color, False,
-                      [(cx - size * 0.5, cy), (cx - size * 0.15, cy + size * 0.4), (cx + size * 0.55, cy - size * 0.45)], 3)
+    red_star_clicked = [False] * 4
+    warning_y = HEIGHT - 70  # Предупреждение чуть выше трека
+    # Музыка
+    track_options = MENU_TRACKS
+    track_y = HEIGHT - 40
 
+    if not music_state["playing"] and os.path.exists(music_state["track"]):
+        pygame.mixer.music.load(music_state["track"])
+        apply_master_volume()
+        pygame.mixer.music.play(-1)
+        music_state["playing"] = True
 
-def draw_flag(surface, x, y, size, russian):
-    if russian:
-        pygame.draw.rect(surface, (255, 255, 255), (x, y, size, size // 3))
-        pygame.draw.rect(surface, (0, 57, 166), (x, y + size // 3, size, size // 3))
-        pygame.draw.rect(surface, (213, 43, 30), (x, y + 2 * size // 3, size, size - 2 * (size // 3)))
-    else:
-        stripe = size / 13
-        for i in range(13):
-            color = (178, 34, 52) if i % 2 == 0 else (255, 255, 255)
-            pygame.draw.rect(surface, color, (x, int(y + i * stripe), size, int(stripe) + 1))
-        pygame.draw.rect(surface, (60, 59, 110), (x, y, size * 2 // 5, int(stripe * 7)))
-        for row in range(4):
-            for col in range(3):
-                pygame.draw.circle(surface, (255, 255, 255), (x + 3 + col * 5, y + 3 + row * 5), 1)
+    # Слайдер громкости
+    slider_x = WIDTH - 210
+    slider_y = 30
+    slider_width = 140
+    slider_height = 8
+    volume_rect = pygame.Rect(slider_x, slider_y - slider_height // 2, slider_width, slider_height)
 
-
-def fade_out(duration=350):
-    snapshot = screen.copy()
-    veil = pygame.Surface((WIDTH, HEIGHT))
-    veil.fill((0, 0, 0))
-    start = pygame.time.get_ticks()
-    while True:
-        k = (pygame.time.get_ticks() - start) / duration
-        if k >= 1:
-            break
-        screen.blit(snapshot, (0, 0))
-        veil.set_alpha(int(255 * k))
-        screen.blit(veil, (0, 0))
-        _real_flip()
-        _real_event_get()
-        clock.tick(60)
-    screen.fill((0, 0, 0))
-    _real_flip()
-
-
-def show_splash():
-    title_font = pygame.font.SysFont("segoeui", max(64, HEIGHT // 8), bold=True)
-    small_font = pygame.font.SysFont("segoeui", 22)
-    warn_font = pygame.font.SysFont("segoeui", 20)
-    start = pygame.time.get_ticks()
-    particles = [[random.uniform(0, WIDTH), random.uniform(0, HEIGHT), random.uniform(-0.3, 0.3),
-                  random.uniform(-0.6, -0.1), random.randint(1, 3)] for _ in range(140)]
-    while True:
+    while showing:
         now = pygame.time.get_ticks()
-        elapsed = now - start
+        mx, my = pygame.mouse.get_pos()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN) and elapsed > 600:
-                return
-        if elapsed > 7000:
-            return
-        screen.fill((6, 6, 14))
-        for p in particles:
-            p[0] = (p[0] + p[2]) % WIDTH
-            p[1] = (p[1] + p[3]) % HEIGHT
-            b = 120 + int(80 * math.sin(now * 0.002 + p[0]))
-            pygame.draw.circle(screen, (b, b // 2 + 60, 60), (int(p[0]), int(p[1])), p[4])
-        k = min(1.0, elapsed / 1500)
-        screen.blit(make_glow(int(HEIGHT * 0.35), (255, 120, 40), int(60 * k)),
-                    (WIDTH // 2 - int(HEIGHT * 0.35), HEIGHT // 2 - int(HEIGHT * 0.35) - 40))
-        title = title_font.render("RELACS", True, (255, 200 + int(40 * math.sin(now * 0.003)), 120))
-        title.set_alpha(int(255 * k))
-        screen.blit(title, title.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 60)))
-        sub = small_font.render(tr("subtitle"), True, (200, 200, 220))
-        sub.set_alpha(int(255 * k))
-        screen.blit(sub, sub.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 10)))
-        if elapsed > 900:
-            warn = warn_font.render(tr("warning"), True, (255, 170, 90))
-            warn.set_alpha(min(255, (elapsed - 900) // 3))
-            screen.blit(warn, warn.get_rect(center=(WIDTH // 2, HEIGHT - 130)))
-            if (now // 600) % 2 == 0:
-                press = small_font.render(tr("press"), True, (180, 180, 200))
-                screen.blit(press, press.get_rect(center=(WIDTH // 2, HEIGHT - 80)))
-        pygame.display.flip()
-        clock.tick(60)
-
-
-def _track_ending(key, func):
-    def wrapper(*args, **kwargs):
-        if key not in SAVE["endings"]:
-            SAVE["endings"].append(key)
-            write_save()
-            name = next(names[language] for k, _, names in ENDINGS if k == key)
-            notify(f"{tr('ending_open')}: {name}", f"{len(SAVE['endings'])}/{len(ENDINGS)}", (255, 120, 255))
-            if len(SAVE["endings"]) == len(ENDINGS):
-                notify(tr("all_endings"), tr("all_endings_sub"), (255, 215, 90))
-        return func(*args, **kwargs)
-    return wrapper
-
-
-def show_intro_screen():
-    title_font = pygame.font.SysFont("segoeui", max(48, HEIGHT // 14), bold=True)
-    sub_font = pygame.font.SysFont("segoeui", 20, italic=True)
-    name_font = pygame.font.SysFont("segoeui", 26, bold=True)
-    desc_font = pygame.font.SysFont("segoeui", 17)
-    tag_font = pygame.font.SysFont("segoeui", 13, bold=True)
-    info_font = pygame.font.SysFont("segoeui", 17)
-    big_font = pygame.font.SysFont("segoeui", 40, bold=True)
-
-    # --- Раскладка карточек: 2 колонки × 4 ряда ---
-    cols, rows = 2, 4
-    gap = 18
-    card_w = min(520, (WIDTH - 160 - gap) // cols)
-    card_h = max(66, min(96, (HEIGHT - 400) // (rows + 1)))
-    grid_w = cols * card_w + (cols - 1) * gap
-    grid_x = (WIDTH - grid_w) // 2
-    grid_y = max(170, int(HEIGHT * 0.22))
-    card_rects = []
-    for i in range(len(MODES)):
-        c, r = i % cols, i // cols
-        card_rects.append(pygame.Rect(grid_x + c * (card_w + gap), grid_y + r * (card_h + gap), card_w, card_h))
-    secret_rect = pygame.Rect(WIDTH // 2 - card_w // 2, grid_y + rows * (card_h + gap) + 6, card_w, card_h)
-
-    slider_w = 160
-    slider_rect = pygame.Rect(WIDTH - 230, 34, slider_w, 8)
-    flag_rect = pygame.Rect(WIDTH - 58, 22, 40, 28)
-    bottom_y = HEIGHT - 70
-
-    # --- Звёздное небо ---
-    stars = [[random.uniform(0, WIDTH), random.uniform(0, HEIGHT), random.uniform(0.3, 1.0), random.uniform(0, 6.28)]
-             for _ in range(160)]
-    blocked = [r.inflate(30, 30) for r in card_rects] + [secret_rect.inflate(30, 30),
-               pygame.Rect(0, 0, WIDTH, grid_y - 20), pygame.Rect(0, bottom_y - 20, WIDTH, HEIGHT)]
-    red_stars = []
-    attempts = 0
-    while len(red_stars) < 4 and attempts < 5000:
-        attempts += 1
-        x, y = random.randint(30, WIDTH - 30), random.randint(grid_y - 10, bottom_y - 30)
-        if any(r.collidepoint(x, y) for r in blocked):
-            continue
-        if any(math.hypot(x - rx, y - ry) < 120 for rx, ry, _ in red_stars):
-            continue
-        red_stars.append([x, y, SAVE["red_stars_found"]])
-    if len(red_stars) < 4:  # Очень маленький экран — ставим звёзды по углам
-        red_stars = [[40, grid_y, True], [WIDTH - 40, grid_y, True], [40, bottom_y - 40, True],
-                     [WIDTH - 40, bottom_y - 40, True]]
-        SAVE["red_stars_found"] = True
-    ripples = []
-
-    hover_anim = [0.0] * (len(MODES) + 1)
-    selected = -1
-    last_hover = -1
-    confirm_quit = False
-    dragging_volume = False
-    menu_fade = 255
-    trail = []
-
-    play_menu_music()
-
-    def secret_available():
-        return SAVE["red_stars_found"]
-
-    def launch(index):
-        nonlocal menu_fade, last_hover
-        play_ui("click")
-        fade_out()
-        pygame.mixer.music.stop()
-        if index < len(MODES):
-            mode = MODES[index]
-            if mode["id"] not in SAVE["visited"]:
-                SAVE["visited"].append(mode["id"])
-                write_save()
-                notify(f"{tr('mode_open')}: {mode[language][0]}", f"{len(SAVE['visited'])}/{len(MODES)}",
-                       mode["color"])
-                if len(SAVE["visited"]) == len(MODES):
-                    notify(tr("explorer"), tr("explorer_sub"), (255, 215, 90))
-            func = globals()[mode["func"]]
-        else:
-            SAVE["secret_entered"] = True
-            write_save()
-            if os.path.exists("Glitc.mp3"):
-                pygame.mixer.music.load("Glitc.mp3")
-                pygame.mixer.music.set_volume(1.0)
-                pygame.mixer.music.play()
-            func = run_illusion_mode
-        try:
-            func()
-        except BackToMenu:
-            pass
-        pygame.mixer.stop()
-        pygame.mouse.set_visible(False)
-        pygame.event.clear()
-        play_menu_music()
-        menu_fade = 255
-        last_hover = -1
-
-    def switch_track():
-        SAVE["track_index"] = (SAVE["track_index"] + 1) % len(MENU_TRACKS)
-        write_save()
-        play_menu_music()
-
-    def toggle_music():
-        if music_state["paused"]:
-            music_state["paused"] = False
-            if pygame.mixer.music.get_busy():
-                pygame.mixer.music.unpause()
-            else:
-                play_menu_music()
-        else:
-            music_state["paused"] = True
-            pygame.mixer.music.pause()
-
-    def set_volume_from_x(x):
-        SAVE["volume"] = max(0.0, min(1.0, (x - slider_rect.x) / slider_rect.w))
-        apply_master_volume()
-
-    def card_count():
-        return len(MODES) + (1 if secret_available() else 0)
-
-    def move_selection(dx, dy):
-        nonlocal selected
-        if selected < 0:
-            selected = 0
-            return
-        if selected == len(MODES):
-            if dy < 0:
-                selected = len(MODES) - 2
-            return
-        c, r = selected % cols, selected // cols
-        c = max(0, min(cols - 1, c + dx))
-        r += dy
-        if r >= rows:
-            selected = len(MODES) if secret_available() else selected
-            return
-        r = max(0, r)
-        selected = r * cols + c
-
-    while True:
-        now = pygame.time.get_ticks()
-        t = now / 1000.0
-        mx, my = pygame.mouse.get_pos()
-
-        pending_launch = None
-        hovered = -1
-        for i, rect in enumerate(card_rects):
-            if rect.collidepoint(mx, my):
-                hovered = i
-        if secret_available() and secret_rect.collidepoint(mx, my):
-            hovered = len(MODES)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                write_save()
-                return
-            if confirm_quit:
-                if event.type == pygame.KEYDOWN:
-                    if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_y):
-                        write_save()
-                        return
-                    if event.key in (pygame.K_ESCAPE, pygame.K_n, pygame.K_SPACE):
-                        confirm_quit = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    confirm_quit = False
-                continue
-            if event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    confirm_quit = True
+                    showing = False
                 elif event.key == pygame.K_n:
-                    switch_track()
-                elif event.key == pygame.K_m:
-                    toggle_music()
-                elif event.key == pygame.K_l:
-                    set_language("en" if language == "ru" else "ru")
-                elif event.key in (pygame.K_LEFT, pygame.K_a):
-                    move_selection(-1, 0)
-                elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                    move_selection(1, 0)
-                elif event.key in (pygame.K_UP, pygame.K_w):
-                    move_selection(0, -1)
-                elif event.key in (pygame.K_DOWN, pygame.K_s):
-                    move_selection(0, 1)
-                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE) and 0 <= selected < card_count():
-                    pending_launch = selected
-            elif event.type == pygame.MOUSEMOTION:
-                if hovered >= 0:
-                    selected = hovered
-                if dragging_volume:
-                    set_volume_from_x(event.pos[0])
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                if dragging_volume:
-                    dragging_volume = False
+                    music_state["index"] = (music_state["index"] + 1) % len(track_options)
+                    music_state["track"] = track_options[music_state["index"]]
+                    SAVE["track_index"] = music_state["index"]
                     write_save()
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if slider_rect.inflate(16, 24).collidepoint(event.pos):
-                    dragging_volume = True
-                    set_volume_from_x(event.pos[0])
-                elif flag_rect.collidepoint(event.pos):
-                    set_language("en" if language == "ru" else "ru")
-                    play_ui("click")
-                elif hovered >= 0:
-                    pending_launch = hovered
-                else:
-                    for star in red_stars:
-                        if not star[2] and math.hypot(event.pos[0] - star[0], event.pos[1] - star[1]) < 14:
-                            star[2] = True
-                            ripples.append([star[0], star[1], now])
-                            found = sum(1 for s in red_stars if s[2])
-                            play_ui("star")
-                            if found == len(red_stars):
-                                SAVE["red_stars_found"] = True
-                                write_save()
-                                notify(tr("secret_open"), tr("secret_open_sub"), (255, 80, 200))
-                            else:
-                                notify(f"{tr('red_star')} {found}/{len(red_stars)}", "", (255, 90, 90))
-                            break
+                    if os.path.exists(music_state["track"]):
+                        pygame.mixer.music.load(music_state["track"])
+                        apply_master_volume()
+                        if not music_state["paused"]:
+                            pygame.mixer.music.play(-1)
+                            music_state["playing"] = True
+                elif event.key == pygame.K_m:
+                    if music_state["playing"]:
+                        if not music_state["paused"]:
+                            pygame.mixer.music.pause()
+                            music_state["paused"] = True
+                        else:
+                            pygame.mixer.music.unpause()
+                            music_state["paused"] = False
+                    else:
+                        if os.path.exists(music_state["track"]):
+                            pygame.mixer.music.load(music_state["track"])
+                            apply_master_volume()
+                            pygame.mixer.music.play(-1)
+                            music_state["playing"] = True
+                            music_state["paused"] = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Кнопки
+                for i, (_, action, _) in enumerate(buttons):
+                    btn_rect = pygame.Rect(WIDTH // 2 - button_width // 2, start_y + i * gap, button_width,
+                                           button_height)
+                    if btn_rect.collidepoint(event.pos):
+                        saved_music_state = music_state.copy()
+                        try:
+                            action()
+                        except BackToMenu:
+                            pass
+                        pygame.mixer.stop()
+                        pygame.event.clear()
+                        if os.path.exists(saved_music_state["track"]) and not saved_music_state["paused"]:
+                            pygame.mixer.music.load(saved_music_state["track"])
+                            apply_master_volume()
+                            pygame.mixer.music.play(-1)
+                            music_state.update(saved_music_state)
+                        elif saved_music_state["paused"]:
+                            pygame.mixer.music.pause()
+                            music_state["paused"] = True
 
-        if pending_launch is not None:
-            launch(pending_launch)
-            continue
+                # Секретная кнопка
+                if all(red_star_clicked) and secret_button_rect.collidepoint(event.pos):
+                    saved_music_state = music_state.copy()
+                    if os.path.exists("Glitc.mp3"):
+                        pygame.mixer.music.load("Glitc.mp3")
+                        pygame.mixer.music.play()
+                    try:
+                        secret_button_data[1]()
+                    except BackToMenu:
+                        pass
+                    pygame.mixer.stop()
+                    pygame.event.clear()
+                    if os.path.exists(saved_music_state["track"]) and not saved_music_state["paused"]:
+                        pygame.mixer.music.load(saved_music_state["track"])
+                        apply_master_volume()
+                        pygame.mixer.music.play(-1)
 
-        if hovered >= 0 and hovered != last_hover:
-            play_ui("hover")
-        last_hover = hovered
+                # Красные звёзды
+                for i, idx in enumerate(red_star_indices):
+                    x, y = stars[idx]
+                    if abs(mx - x) < 8 and abs(my - y) < 8:
+                        red_star_clicked[i] = True
 
-        # === Фон ===
-        draw_gradient_background(screen, (16, 14, 38))
-        screen.blit(make_glow(int(HEIGHT * 0.45), (90, 40, 160), 45),
-                    (int(WIDTH * 0.2 + math.sin(t * 0.1) * 60) - int(HEIGHT * 0.45), int(HEIGHT * 0.35) - int(HEIGHT * 0.45)))
-        screen.blit(make_glow(int(HEIGHT * 0.4), (30, 90, 160), 40),
-                    (int(WIDTH * 0.8 + math.cos(t * 0.12) * 60) - int(HEIGHT * 0.4), int(HEIGHT * 0.7) - int(HEIGHT * 0.4)))
-        par_x = (mx - WIDTH / 2) / WIDTH
-        par_y = (my - HEIGHT / 2) / HEIGHT
-        for s in stars:
-            s[1] += 0.05 * s[2]
-            if s[1] > HEIGHT:
-                s[1] = 0
-                s[0] = random.uniform(0, WIDTH)
-            b = int(120 + 120 * s[2] * (0.6 + 0.4 * math.sin(t * 2 * s[2] + s[3])))
-            x = int(s[0] - par_x * 25 * s[2]) % WIDTH
-            y = int(s[1] - par_y * 25 * s[2])
-            pygame.draw.circle(screen, (b, b, min(255, b + 30)), (x, y), 1 if s[2] < 0.7 else 2)
-        for x, y, found in red_stars:
-            if not found:
-                pulse = 3 + math.sin(t * 3 + x) * 1
-                screen.blit(make_glow(14, (255, 60, 60), 90), (x - 14, y - 14))
-                pygame.draw.circle(screen, (255, 90, 90), (x, y), int(pulse))
-        for rp in ripples[:]:
-            age = (now - rp[2]) / 900
-            if age >= 1:
-                ripples.remove(rp)
-                continue
-            pygame.draw.circle(screen, (255, int(120 * (1 - age)), int(120 * (1 - age))), (rp[0], rp[1]), int(10 + age * 80), 2)
+                # Переключение языка по клику на флаг
+                flag_rect = pygame.Rect(WIDTH - 50, 10, 40, 40)
+                if flag_rect.collidepoint(event.pos):
+                    global language, flag_is_russian
+                    if language == "ru":
+                        language = "en"
+                        flag_is_russian = False
+                    else:
+                        language = "ru"
+                        flag_is_russian = True
+                    SAVE["language"] = language
+                    write_save()
 
-        # === Заголовок ===
-        title_color = (255, 190 + int(40 * math.sin(t * 2)), 110)
-        title = title_font.render("RELACS", True, title_color)
-        title_pos = title.get_rect(center=(WIDTH // 2, 70))
-        screen.blit(make_glow(160, (255, 120, 40), 50), (title_pos.centerx - 160, title_pos.centery - 160))
-        screen.blit(title, title_pos)
-        sub = sub_font.render(tr("subtitle"), True, (200, 200, 230))
-        screen.blit(sub, sub.get_rect(center=(WIDTH // 2, title_pos.bottom + 8)))
-        riddle = info_font.render(tr("riddle"), True, (150, 150, 185))
-        screen.blit(riddle, riddle.get_rect(center=(WIDTH // 2, title_pos.bottom + 40)))
+                if volume_rect.collidepoint(event.pos):
+                    relative_x = event.pos[0] - slider_x
+                    new_volume = max(0.0, min(1.0, relative_x / slider_width))
+                    music_state["volume"] = SAVE["volume"] = new_volume
+                    apply_master_volume()
+                # Слайдер
+                if volume_rect.collidepoint(event.pos):
+                    relative_x = event.pos[0] - slider_x
+                    new_volume = max(0.0, min(1.0, relative_x / slider_width))
+                    music_state["volume"] = SAVE["volume"] = new_volume
+                    apply_master_volume()
 
-        # === Карточки режимов ===
-        entries = list(enumerate(MODES))
-        if secret_available():
-            entries.append((len(MODES), None))
-        for i, mode in entries:
-            target = 1.0 if i == selected else 0.0
-            hover_anim[i] += (target - hover_anim[i]) * 0.2
-            h = hover_anim[i]
-            if mode is None:
-                rect = secret_rect.copy()
-                if h > 0.5:
-                    rect.move_ip(random.randint(-2, 2), random.randint(-2, 2))
-                color = (255, 60 + int(60 * math.sin(t * 5)), 220)
-                name, desc, icon = tr("secret"), tr("secret_desc"), "secret"
-                visited = SAVE["secret_entered"]
+                menu_shown = True
+
+        # Фон
+        draw_gradient_background(screen, (10, 10, 20))
+
+        # Рисуем звёзды
+        for i, (x, y) in enumerate(stars):
+            if i in red_star_indices and not red_star_clicked[red_star_indices.index(i)]:
+                pygame.draw.circle(screen, (255, 80, 80), (x, y), 4)
             else:
-                rect = card_rects[i].copy()
-                color = mode["color"]
-                name, desc = mode[language]
-                icon = mode["icon"]
-                visited = mode["id"] in SAVE["visited"]
-            rect.y -= int(4 * h)
-            if h > 0.05:
-                glow_r = rect.h
-                glow = make_glow(glow_r, color, int(60 * h))
-                screen.blit(pygame.transform.smoothscale(glow, (rect.w + glow_r, rect.h + glow_r)),
-                            (rect.x - glow_r // 2, rect.y - glow_r // 2))
-            panel = pygame.Surface(rect.size, pygame.SRCALPHA)
-            pygame.draw.rect(panel, (24 + int(16 * h), 22 + int(14 * h), 46 + int(20 * h), 215), panel.get_rect(),
-                             border_radius=16)
-            pygame.draw.rect(panel, (*color, 110 + int(145 * h)), panel.get_rect(), width=2, border_radius=16)
-            pygame.draw.rect(panel, color, (0, 14, 5, rect.h - 28), border_radius=3)
-            screen.blit(panel, rect.topleft)
-            icon_size = rect.h - 26
-            icon_center = (rect.x + 22 + icon_size // 2, rect.centery)
-            pygame.draw.circle(screen, (14, 14, 30), icon_center, icon_size // 2 + 4)
-            draw_mode_icon(screen, icon, icon_center, icon_size, color, t * (1 + h))
-            text_x = rect.x + 40 + icon_size
-            name_surf = name_font.render(name, True, (255, 255, 255))
-            desc_surf = desc_font.render(desc, True, (190, 190, 215))
-            screen.blit(name_surf, (text_x, rect.centery - name_surf.get_height() + 2))
-            screen.blit(desc_surf, (text_x, rect.centery + 4))
-            if visited:
-                draw_check(screen, (rect.right - 26, rect.y + 24), 14, color)
+                pygame.draw.circle(screen, (200, 200, 255), (x, y), 2)
+
+        # Заголовок
+        pulse = 128 + int(127 * math.sin(now * 0.003))
+        glow_color = (255, pulse, 50)
+        title_text = title_font.render("Меню режимов" if language == "ru" else "Mode Menu", True, glow_color)
+        title_rect = title_text.get_rect(center=(WIDTH // 2, 50))
+        screen.blit(title_text, title_rect)
+
+        # Инфо-текст
+        info_lines = info_lines_en if language == "en" else info_lines_ru
+        for i, line in enumerate(info_lines):
+            pulse_line = 180 + int(70 * math.sin(now * 0.002 + i))
+            info_surf = info_font.render(line, True, (pulse_line, pulse_line, pulse_line))
+            info_rect = info_surf.get_rect(center=(WIDTH // 2, 140 + i * 28))
+            screen.blit(info_surf, info_rect)
+
+        # Функция рисования кнопки
+        def draw_button(rect, text, color, icon=""):
+            button_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            for y in range(rect.height):
+                ratio = y / rect.height
+                r = int(color[0] * (1 - ratio) + 20 * ratio)
+                g = int(color[1] * (1 - ratio) + 20 * ratio)
+                b = int(color[2] * (1 - ratio) + 40 * ratio)
+                pygame.draw.line(button_surface, (r, g, b), (0, y), (rect.width, y))
+            shape_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            pygame.draw.rect(shape_surf, (255, 255, 255, 255), shape_surf.get_rect(), border_radius=20)
+            button_surface.blit(shape_surf, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+            pygame.draw.rect(button_surface, (255, 255, 255), button_surface.get_rect(), width=3, border_radius=20)
+            screen.blit(button_surface, rect.topleft)
+            label = info_font.render(text, True, (255, 255, 255))
+            screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
+
+        # Кнопки
+        for i, (label_idx, action, color) in enumerate(buttons):
+            btn_rect = pygame.Rect(WIDTH // 2 - button_width // 2, start_y + i * gap, button_width, button_height)
+            label = button_labels[language][label_idx]
+            draw_button(btn_rect, label, color)
+
+        # Секретная кнопка (с эффектом "дрожания")
+        if all(red_star_clicked):
+            dist = math.hypot(mx - secret_button_rect.centerx, my - secret_button_rect.centery)
+            if dist < 150:
+                secret_button_offset = [random.randint(-3, 3), random.randint(-3, 3)]
             else:
-                tag = tag_font.render(tr("new"), True, (20, 20, 30))
-                tag_rect = pygame.Rect(0, 0, tag.get_width() + 14, tag.get_height() + 4)
-                tag_rect.topright = (rect.right - 14, rect.y + 12)
-                pygame.draw.rect(screen, color, tag_rect, border_radius=8)
-                screen.blit(tag, tag.get_rect(center=tag_rect.center))
+                secret_button_offset = [0, 0]
+            offset_rect = secret_button_rect.move(secret_button_offset[0], secret_button_offset[1])
+            draw_button(offset_rect, secret_button_data[0], secret_button_data[2])
 
-        # === Нижняя панель ===
-        bar = pygame.Surface((WIDTH, HEIGHT - bottom_y), pygame.SRCALPHA)
-        bar.fill((8, 8, 20, 170))
-        screen.blit(bar, (0, bottom_y))
-        pygame.draw.line(screen, (60, 60, 110), (0, bottom_y), (WIDTH, bottom_y), 1)
-        track_name = MENU_TRACKS[SAVE["track_index"] % len(MENU_TRACKS)].replace(".mp3", "")
-        status = f"  ({tr('paused')})" if music_state["paused"] else ""
-        screen.blit(info_font.render(f"♪ {tr('track')}: {track_name}{status}", True, (220, 220, 240)), (24, bottom_y + 12))
-        screen.blit(info_font.render(tr("music_hint"), True, (140, 140, 170)), (24, bottom_y + 38))
+        # Текущий трек
+        track_label = info_font.render(
+            f"Трек: {music_state['track'].replace('.mp3', '')}" if language == "ru" else f"Track: {music_state['track'].replace('.mp3', '')}",
+            True, (200, 200, 200)
+        )
+        screen.blit(track_label, (20, track_y))
 
-        prog = info_font.render(f"{tr('modes')}: {len(SAVE['visited'])}/{len(MODES)}    {tr('endings')}:", True,
-                                (220, 220, 240))
-        px = WIDTH // 2 - (prog.get_width() + len(ENDINGS) * 22) // 2
-        screen.blit(prog, (px, bottom_y + 12))
-        ex = px + prog.get_width() + 14
-        hover_ending = None
-        for k, (key, ecolor, names) in enumerate(ENDINGS):
-            center = (ex + k * 22, bottom_y + 23)
-            if key in SAVE["endings"]:
-                pygame.draw.circle(screen, ecolor, center, 7)
-                if math.hypot(mx - center[0], my - center[1]) < 10:
-                    hover_ending = names[language]
-            else:
-                pygame.draw.circle(screen, (90, 90, 120), center, 7, 1)
-        keys = info_font.render(tr("keys_hint"), True, (140, 140, 170))
-        screen.blit(keys, keys.get_rect(center=(WIDTH // 2, bottom_y + 48)))
-        if hover_ending:
-            tip = info_font.render(hover_ending, True, (255, 255, 255))
-            screen.blit(tip, tip.get_rect(midbottom=(mx, bottom_y - 6)))
+        # Подсказки
+        if show_hint and now - hint_timer < 10000:
+            hint1 = info_font.render(
+                "Нажми 'M' для выкл/вкл музыки" if language == "ru" else "Press 'M' to toggle music", True,
+                (180, 255, 180))
+            hint2 = info_font.render("Нажми 'N' для смены трека" if language == "ru" else "Press 'N' to change track",
+                                     True, (180, 255, 180))
+            screen.blit(hint1, (20, track_y - 40))
+            screen.blit(hint2, (20, track_y - 20))
+        warn_text = warning_font.render(
+            epilepsy_warning_ru if language == "ru" else epilepsy_warning_en,
+            True, (50, 50, 50)  # Оранжевый цвет
+        )
+        warn_rect = warn_text.get_rect(center=(WIDTH // 4 - 218, warning_y - 25))
+        screen.blit(warn_text, warn_rect)        # Флаг
+        flag_x, flag_y = WIDTH - 50, 10
+        flag_size = 40
+        if flag_is_russian:
+            pygame.draw.rect(screen, (255, 255, 255), (flag_x, flag_y, flag_size, flag_size // 3))
+            pygame.draw.rect(screen, (0, 0, 255), (flag_x, flag_y + flag_size // 3, flag_size, flag_size // 3))
+            pygame.draw.rect(screen, (255, 0, 0), (flag_x, flag_y + 2 * flag_size // 3, flag_size, flag_size // 3))
+        else:
+            for i in range(13):
+                color = (255, 0, 0) if i % 2 == 0 else (255, 255, 255)
+                pygame.draw.rect(screen, color, (flag_x, flag_y + i * (flag_size // 13), flag_size, flag_size // 13))
+            pygame.draw.rect(screen, (0, 0, 139), (flag_x, flag_y, flag_size // 2, flag_size // 2))
+            for row in range(5):
+                for col in range(5):
+                    if (row + col) % 2 == 0:
+                        pygame.draw.polygon(screen, (255, 255, 255), [
+                            (flag_x + col * (flag_size // 10) + 2, flag_y + row * (flag_size // 10) + 2),
+                            (flag_x + (col + 0.5) * (flag_size // 10), flag_y + (row + 1) * (flag_size // 10) - 2),
+                            (flag_x + (col + 1) * (flag_size // 10) - 2, flag_y + row * (flag_size // 10) + 2)
+                        ])
 
-        # === Громкость и язык ===
-        vol_label = info_font.render(f"{tr('volume')} {int(SAVE['volume'] * 100)}%", True, (200, 200, 220))
-        screen.blit(vol_label, (slider_rect.x, slider_rect.y - 26))
-        pygame.draw.rect(screen, (60, 60, 90), slider_rect, border_radius=4)
-        fill = slider_rect.copy()
-        fill.w = int(slider_rect.w * SAVE["volume"])
-        pygame.draw.rect(screen, (120, 180, 255), fill, border_radius=4)
-        pygame.draw.circle(screen, (220, 230, 255), (slider_rect.x + fill.w, slider_rect.centery), 9)
-        draw_flag(screen, flag_rect.x, flag_rect.y, flag_rect.w, flag_is_russian)
-        pygame.draw.rect(screen, (200, 200, 220), flag_rect.inflate(4, 4), 1, border_radius=3)
+        # Слайдер громкости
+        pygame.draw.rect(screen, (80, 80, 80), volume_rect, border_radius=4)
+        slider_pos = slider_x + int(music_state["volume"] * slider_width)
+        pygame.draw.rect(screen, (120, 180, 255),
+                         (slider_x, slider_y - slider_height // 2, slider_pos - slider_x, slider_height),
+                         border_radius=4)
+        pygame.draw.circle(screen, (200, 220, 255), (slider_pos, slider_y), 10)
 
-        # === Подтверждение выхода ===
-        if confirm_quit:
-            dim = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-            dim.fill((0, 0, 0, 170))
-            screen.blit(dim, (0, 0))
-            box = pygame.Rect(0, 0, 560, 180)
-            box.center = (WIDTH // 2, HEIGHT // 2)
-            pygame.draw.rect(screen, (24, 22, 48), box, border_radius=18)
-            pygame.draw.rect(screen, (255, 150, 80), box, 2, border_radius=18)
-            q = big_font.render(tr("quit_q"), True, (255, 255, 255))
-            screen.blit(q, q.get_rect(center=(box.centerx, box.centery - 25)))
-            hint = info_font.render(tr("quit_hint"), True, (190, 190, 220))
-            screen.blit(hint, hint.get_rect(center=(box.centerx, box.centery + 35)))
+        vol_label_font = pygame.font.SysFont("consolas", 16)
+        screen.blit(vol_label_font.render("0%", True, (180, 180, 180)), (slider_x - 20, slider_y + 10))
+        screen.blit(vol_label_font.render("100%", True, (180, 180, 250)), (slider_x + slider_width - 10, slider_y + 10))
+        vol_title = vol_label_font.render("Громкость" if language == "ru" else "Volume", True, (200, 200, 200))
+        screen.blit(vol_title, (slider_x + slider_width // 2 - vol_title.get_width() // 2, slider_y - 25))
 
-        # === Курсор со шлейфом ===
-        trail.append((mx, my))
-        trail = trail[-14:]
-        for k, (tx, ty) in enumerate(trail):
-            pygame.draw.circle(screen, (255, 120 + k * 8, 40), (tx, ty), max(1, k // 2))
-        screen.blit(make_glow(22, (255, 150, 60), 120), (mx - 22, my - 22))
-        pygame.draw.circle(screen, (255, 220, 150), (mx, my), 5)
+        # Перетаскивание слайдера
+        if pygame.mouse.get_pressed()[0]:
+            if volume_rect.collidepoint(mx, my):
+                relative_x = mx - slider_x
+                new_volume = max(0.0, min(1.0, relative_x / slider_width))
+                music_state["volume"] = SAVE["volume"] = new_volume
+                apply_master_volume()
 
-        if menu_fade > 0:
-            veil = pygame.Surface((WIDTH, HEIGHT))
-            veil.set_alpha(menu_fade)
-            screen.blit(veil, (0, 0))
-            menu_fade = max(0, menu_fade - 18)
+        # Курсор
+        pygame.draw.circle(screen, (255, 100, 0), (mx, my), 12)
+        pygame.draw.circle(screen, (255, 180, 50), (mx, my), 6)
 
         pygame.display.flip()
-        clock.tick(120)
+        clock.tick(144)
 
-
+    # Восстановление музыки
+    if music_state["playing"] and not music_state["paused"] and os.path.exists(music_state["track"]):
+        pygame.mixer.music.load(music_state["track"])
+        apply_master_volume()
+        pygame.mixer.music.play(-1)
 font = pygame.font.SysFont("consolas", 17)
-
-# Каждая концовка запоминается в сохранении
-run_merge_ending = _track_ending("merge", run_merge_ending)
-run_forget_ending = _track_ending("forget", run_forget_ending)
-run_escape_ending = _track_ending("escape", run_escape_ending)
-run_harmony_ending = _track_ending("harmony", run_harmony_ending)
-run_chaos_ending = _track_ending("chaos", run_chaos_ending)
 
 
 def main():
     apply_master_volume()
-    show_splash()
     show_intro_screen()
     write_save()
     pygame.quit()
